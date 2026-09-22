@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>High Roller: Cassino Roguelike</title>
+  <meta name="description" content="Um jogo de apostas roguelike ultra fluido com Blackjack, Roleta Multiplicadora e Caça-Níqueis.">
+  <!-- Google Fonts: Outfit & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Canvas para partículas de moedas, luzes neon e números flutuantes -->
+  <canvas id="effects-canvas"></canvas>
+
+  <div class="casino-app-wrapper">
+    <!-- Top HUD Bar -->
+    <header class="casino-header">
+      <div class="header-branding">
+        <div class="brand-badge">🎲 CASINO ROGUELIKE</div>
+        <h1 class="brand-title">HIGH ROLLER</h1>
+      </div>
+
+      <div class="header-hud-metrics">
+        <!-- Floor -->
+        <div class="hud-box floor-box">
+          <span class="hud-label">ANDAR</span>
+          <span class="hud-value highlight" id="hud-floor-val">Andar 1</span>
+          <span class="hud-sub">Aposte sem limite de rodadas!</span>
+        </div>
+
+        <!-- Cash Balance -->
+        <div class="hud-box cash-box">
+          <span class="hud-label">SEU SALDO</span>
+          <span class="hud-value money" id="hud-cash-val">$100</span>
+          <span class="hud-sub">Fichas disponíveis</span>
+        </div>
+
+        <!-- Floor Modifier Anomaly -->
+        <div class="hud-box modifier-box" id="hud-modifier-box" style="display: none;">
+          <span class="hud-label">ANOMALIA DO ANDAR</span>
+          <span class="hud-value anomaly" id="hud-modifier-name">🌪️ Alta Volatilidade</span>
+          <span class="hud-sub" id="hud-modifier-desc">Ganhos +50%, Derrotas +50%</span>
+        </div>
+
+        <!-- Quota Progress -->
+        <div class="hud-box quota-box">
+          <div class="quota-header">
+            <span class="hud-label">META DA FASE</span>
+            <span class="hud-value gold" id="hud-quota-val">$250</span>
+          </div>
+          <div class="quota-bar-wrapper">
+            <div class="quota-bar-fill" id="hud-quota-progress-bar" style="width: 40%;"></div>
+          </div>
+          <button id="pay-quota-now-btn" class="btn-pay-quota" disabled title="Pague a cota assim que atingir a meta para avançar!">
+            Pagar Cota &amp; Subir ➔
+          </button>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="header-restart-btn" class="btn-restart-run" title="Reiniciar a run desde o Andar 1">🔄 Reiniciar</button>
+        <button id="sound-toggle-btn" class="btn-sound-toggle">🔊 Som: ON</button>
+      </div>
+    </header>
+
+    <!-- Quick Consumables Belt (Buckshot Roulette) -->
+    <div class="consumables-hud-bar">
+      <div class="consumables-title">⚡ Itens Rápidos de Mesa:</div>
+      <div class="consumables-buttons-row">
+        <button id="btn-use-spyglass" class="btn-consumable-slot" title="Lupa: Espia a próxima carta do Blackjack ou previsão dos slots">
+          <span class="item-ico">🔍</span> Lupa (<strong id="count-spyglass">1</strong>)
+        </button>
+        <button id="btn-use-magnet" class="btn-consumable-slot" title="Ímã: Salva do 0x no próximo giro da roleta">
+          <span class="item-ico">🧲</span> Ímã (<strong id="count-magnet">1</strong>)
+        </button>
+        <button id="btn-use-energy" class="btn-consumable-slot" title="Café: Dá +5% da meta como dinheiro extra">
+          <span class="item-ico">☕</span> Café (<strong id="count-energy">0</strong>)
+        </button>
+        <button id="btn-use-double" class="btn-consumable-slot" title="Tônico da Sorte: Dobra (2x) o pagamento da próxima vitória!">
+          <span class="item-ico">🧪</span> Tônico 2x (<strong id="count-double">0</strong>)
+        </button>
+        <button id="btn-use-insurance" class="btn-consumable-slot" title="Seguro: Reembolsa 75% da aposta se você for derrotado!">
+          <span class="item-ico">🛡️</span> Seguro 75% (<strong id="count-insurance">0</strong>)
+        </button>
+      </div>
+      <div class="consumables-active-buffs" id="hud-active-buffs"></div>
+    </div>
+
+    <!-- Relics Belt / Active Inventory -->
+    <div class="relics-belt">
+      <span class="relics-belt-title">🎒 Relíquias Ativas:</span>
+      <div class="relics-belt-list" id="hud-relics-list">
+        <span class="relic-empty-hint">Nenhuma relíquia ativa (visite a loja para trapaças!)</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="casino-tabs">
+      <button class="nav-tab-btn active" data-view="roulette">
+        <span class="tab-icon">🎡</span>
+        <span class="tab-title">Roleta Multiplicadora</span>
+        <span class="tab-badge">Bingle Bingle</span>
+      </button>
+      <button class="nav-tab-btn" data-view="blackjack">
+        <span class="tab-icon">🃏</span>
+        <span class="tab-title">Blackjack High-Stakes</span>
+        <span class="tab-badge">Mesa 21</span>
+      </button>
+      <button class="nav-tab-btn" data-view="slots">
+        <span class="tab-icon">🎰</span>
+        <span class="tab-title">Caça-Níquel Neon</span>
+        <span class="tab-badge">Quantum Slots</span>
+      </button>
+      <button class="nav-tab-btn" data-view="plinko">
+        <span class="tab-icon">🔵</span>
+        <span class="tab-title">Plinko Caótico</span>
+        <span class="tab-badge">Física Real</span>
+      </button>
+      <button class="nav-tab-btn" data-view="shop">
+        <span class="tab-icon">🏪</span>
+        <span class="tab-title">Loja Clandestina</span>
+        <span class="tab-badge special">Trapaças</span>
+      </button>
+    </nav>
+
+    <!-- Main Game Stages -->
+    <main class="casino-main-stage">
+      <!-- 1. Multiplier Roulette (Bingle Bingle) -->
+      <section id="view-roulette" class="game-view-panel active">
+        <div class="roulette-layout">
+          <!-- Left: Multiplier Wheel -->
+          <div class="roulette-wheel-container">
+            <canvas id="roulette-canvas" width="460" height="460"></canvas>
+            <div class="wheel-action-bar">
+              <button id="roulette-spin-btn" class="btn-spin-wheel">
+                <span class="spin-icon">⚡</span> GIRAR ROLETA
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Betting Controls -->
+          <div class="roulette-controls-panel">
+            <div class="panel-section-title">
+              <h3>🎡 Roleta Multiplicadora (Bingle Bingle)</h3>
+              <p>Aposte fichas na roda e ganhe multiplicadores! EV médio positivo (~1.15x). Compre relíquias na loja para turbinar os setores!</p>
+            </div>
+
+            <div class="table-limits-banner" id="roulette-table-limits">
+              <span class="limits-left">🏛️ Mesa Andar <strong id="roulette-limit-floor">1</strong></span>
+              <span class="limits-right">Aposta Mínima: <strong id="roulette-limit-min">$15</strong></span>
+            </div>
+
+            <div class="betting-chips-row dynamic-chips-rack" id="roulette-chips-rack"></div>
+
+            <div class="bet-stepper-row">
+              <button class="btn-bet-step" id="roulette-step-minus" title="Diminuir aposta">-</button>
+              <div class="bet-display-box">
+                <span class="bet-display-label">Aposta:</span>
+                <strong class="bet-display-val" id="roulette-current-bet">$15</strong>
+              </div>
+              <button class="btn-bet-step" id="roulette-step-plus" title="Aumentar aposta">+</button>
+              <button class="btn-bet-pct" id="roulette-pct-25">25%</button>
+              <button class="btn-bet-pct" id="roulette-pct-50">50%</button>
+              <button class="btn-bet-pct chip-allin" id="roulette-allin-btn">ALL-IN</button>
+            </div>
+
+            <div class="rules-card-mini">
+              <strong>Setores da Roleta (EV ~1.15x):</strong>
+              <div class="sector-legend">
+                <span class="badge-skull">☠️ 0x: Tudo Perdido</span>
+                <span class="badge-half">⚠️ 0.5x: Perda Parcial</span>
+                <span class="badge-half" style="border-color:#34495e; color:#bdc3c7;">🛡️ 1.0x: Devolvido</span>
+                <span class="badge-win">✨ 1.2x–3.0x: Lucro</span>
+                <span class="badge-jackpot">🎰 5x JACKPOT</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Blackjack High Stakes -->
+      <section id="view-blackjack" class="game-view-panel">
+        <div class="blackjack-table-felt">
+          <!-- Dealer Area -->
+          <div class="bj-zone bj-dealer-zone">
+            <div class="bj-person-info">
+              <span class="dealer-avatar">🤵</span>
+              <div class="dealer-text-meta">
+                <strong class="dealer-name">Dealer da Casa</strong>
+                <span class="dealer-score-badge">Pontos: <strong id="bj-dealer-score">0</strong></span>
+              </div>
+            </div>
+            <div class="dealer-speech-bubble" id="bj-dealer-speech">
+              "Bem-vindo à mesa de apostas altas. Mostre do que é capaz."
+            </div>
+            <div class="bj-cards-row" id="bj-dealer-cards">
+              <!-- Cards dynamically inserted -->
+            </div>
+          </div>
+
+          <!-- Divider / Center Table Print -->
+          <div class="bj-felt-center">
+            <div class="bj-payout-banner">BLACKJACK PAGA 3:2 • DEALER DEVE COMPRAR ATÉ 16 E PARAR NO 17</div>
+          </div>
+
+          <!-- Player Area -->
+          <div class="bj-zone bj-player-zone">
+            <div class="bj-cards-row" id="bj-player-cards">
+              <!-- Cards dynamically inserted -->
+            </div>
+            <div class="bj-player-stats-bar">
+              <span class="player-score-badge">Sua Mão: <strong id="bj-player-score">0</strong></span>
+              <div class="bj-bet-summary">Aposta: <strong id="bj-current-bet">$50</strong></div>
+            </div>
+          </div>
+
+          <!-- Blackjack Control Bar -->
+          <div class="bj-controls-bottom">
+            <div class="table-limits-banner" id="bj-table-limits">
+              <span class="limits-left">🏛️ Mesa Andar <strong id="bj-limit-floor">1</strong></span>
+              <span class="limits-right">Aposta Mínima: <strong id="bj-limit-min">$15</strong></span>
+            </div>
+
+            <div class="bj-chips-bar dynamic-chips-rack" id="bj-chips-rack"></div>
+
+            <div class="bet-stepper-row">
+              <button class="btn-bet-step" id="bj-step-minus" title="Diminuir aposta">-</button>
+              <button class="btn-bet-step" id="bj-step-plus" title="Aumentar aposta">+</button>
+              <button class="btn-bet-pct" id="bj-pct-25">25%</button>
+              <button class="btn-bet-pct" id="bj-pct-50">50%</button>
+              <button class="btn-bet-pct chip-allin" id="bj-allin-btn">ALL-IN</button>
+            </div>
+
+            <div class="bj-actions-bar">
+              <button id="bj-deal-btn" class="btn-luxury action-deal">DAR CARTAS</button>
+              <button id="bj-hit-btn" class="btn-luxury action-hit" disabled>+ COMPRAR (HIT)</button>
+              <button id="bj-stand-btn" class="btn-luxury action-stand" disabled>✋ PARAR (STAND)</button>
+              <button id="bj-double-btn" class="btn-luxury action-double" disabled>⚡ DOBRAR (DOUBLE)</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Quantum Slots -->
+      <section id="view-slots" class="game-view-panel">
+        <div class="slots-machine-cabinet">
+          <div class="slots-cabinet-header">
+            <h2 class="neon-slot-title">QUANTUM 777</h2>
+            <p>Alinhe os símbolos cibernéticos para pagamentos de até 65x!</p>
+          </div>
+
+          <div class="slots-reels-stage" id="slots-reels-container">
+            <div class="slot-reel" id="slot-reel-1">7️⃣</div>
+            <div class="slot-reel" id="slot-reel-2">💎</div>
+            <div class="slot-reel" id="slot-reel-3">7️⃣</div>
+          </div>
+
+          <div class="slots-controls-tray">
+            <div class="table-limits-banner" id="slots-table-limits">
+              <span class="limits-left">🏛️ Mesa Andar <strong id="slots-limit-floor">1</strong></span>
+              <span class="limits-right">Aposta Mínima: <strong id="slots-limit-min">$15</strong></span>
+            </div>
+
+            <div class="slots-chips-row dynamic-chips-rack" id="slots-chips-rack"></div>
+
+            <div class="bet-stepper-row">
+              <button class="btn-bet-step" id="slots-step-minus" title="Diminuir aposta">-</button>
+              <button class="btn-bet-step" id="slots-step-plus" title="Aumentar aposta">+</button>
+              <button class="btn-bet-pct" id="slots-pct-25">25%</button>
+              <button class="btn-bet-pct" id="slots-pct-50">50%</button>
+              <button class="btn-bet-pct chip-allin" id="slots-allin-btn">ALL-IN</button>
+            </div>
+
+            <div class="slots-spin-action-row">
+              <div class="slots-bet-label">
+                Aposta por Giro: <strong id="slots-current-bet">$15</strong>
+              </div>
+              <button id="slots-spin-btn" class="btn-spin-slots">
+                <span class="lever-icon">🕹️</span> PUXAR ALAVANCA
+              </button>
+            </div>
+          </div>
+
+          <div class="slots-paytable">
+            <div class="paytable-item"><span>👑 3 Coroas:</span> <strong>65x</strong></div>
+            <div class="paytable-item"><span>7️⃣ 3 Sete:</span> <strong>35x</strong></div>
+            <div class="paytable-item"><span>💎 3 Diamantes:</span> <strong>15x</strong></div>
+            <div class="paytable-item"><span>🔔 3 Sinos:</span> <strong>8x</strong></div>
+            <div class="paytable-item"><span>🍒 3 Cerejas:</span> <strong>3x</strong></div>
+            <div class="paytable-item"><span>✨ Qualquer Par:</span> <strong>1.5x a 10x</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Plinko Caótico -->
+      <section id="view-plinko" class="game-view-panel">
+        <div class="plinko-layout">
+          <div class="plinko-canvas-wrapper">
+            <canvas id="plinko-canvas"></canvas>
+          </div>
+          <div class="plinko-controls-panel">
+            <div class="panel-section-title">
+              <h3>🔵 Plinko Caótico</h3>
+              <p>Solte bolas do topo e veja até onde chegam entre os pinos! O <strong>centro vale 20x</strong>, as bordas valem 0.2x. Lance <strong>múltiplas bolas de uma vez</strong>!</p>
+            </div>
+
+            <!-- Ball Count Selector -->
+            <div class="plinko-ball-selector">
+              <span class="ball-selector-label">🔵 Quantidade de Bolas:</span>
+              <div class="ball-count-btns">
+                <button class="plinko-ball-count-btn active" data-count="1">1x</button>
+                <button class="plinko-ball-count-btn" data-count="3">3x</button>
+                <button class="plinko-ball-count-btn" data-count="5">5x</button>
+                <button class="plinko-ball-count-btn" data-count="10">10x</button>
+              </div>
+            </div>
+
+            <div class="table-limits-banner" id="plinko-table-limits">
+              <span class="limits-left">🏛️ Mesa Andar <strong id="plinko-limit-floor">1</strong></span>
+              <span class="limits-right">Aposta Mínima: <strong id="plinko-limit-min">$15</strong></span>
+            </div>
+
+            <div class="betting-chips-row dynamic-chips-rack" id="plinko-chips-rack"></div>
+
+            <div class="bet-stepper-row">
+              <button class="btn-bet-step" id="plinko-step-minus" title="Diminuir aposta">-</button>
+              <div class="bet-display-box">
+                <span class="bet-display-label">Aposta/Bola × Total:</span>
+                <strong class="bet-display-val" id="plinko-current-bet">$15 × 1 = $15</strong>
+              </div>
+              <button class="btn-bet-step" id="plinko-step-plus" title="Aumentar aposta">+</button>
+              <button class="btn-bet-pct" id="plinko-pct-25">25%</button>
+              <button class="btn-bet-pct" id="plinko-pct-50">50%</button>
+              <button class="btn-bet-pct chip-allin" id="plinko-allin-btn">ALL-IN</button>
+            </div>
+
+            <button id="plinko-drop-btn" class="btn-spin-wheel" style="margin-top:1rem;">
+              <span class="spin-icon">🔵</span> SOLTAR BOLAS!
+            </button>
+
+            <div class="rules-card-mini" style="margin-top:1.2rem;">
+              <strong>Multiplicadores dos Potes:</strong>
+              <div class="sector-legend">
+                <span class="badge-skull">Bordas: 0.2x – 0.5x</span>
+                <span class="badge-half">Meio: 1x – 2x</span>
+                <span class="badge-win">Interno: 5x</span>
+                <span class="badge-jackpot">Centro: 🎯 20x JACKPOT</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Shady Relics & Cheats Shop -->
+      <section id="view-shop" class="game-view-panel">
+        <div class="shop-wrapper">
+          <div class="shop-header">
+            <span class="shop-dealer-icon">🕶️</span>
+            <div class="shop-header-info">
+              <h2>Mercado Clandestino do Cassino</h2>
+              <p>Adquira relíquias poderosas, consumíveis rápidos e injeções de dinheiro para avançar de fase.</p>
+            </div>
+            <button id="shop-reroll-btn" class="btn-reroll-shop">
+              <span class="reroll-icon">🔄</span> Reabastecer Estoque (<strong id="shop-reroll-cost">$40</strong>)
+            </button>
+          </div>
+
+          <!-- Section 1: Wheel Upgrades & Relics (Bingle Bingle) -->
+          <div class="shop-category-block">
+            <div class="shop-category-title">
+              <h3>🎡 Relíquias &amp; Trapaças de Mesa</h3>
+              <p>Modificadores permanentes e peças de ponta para alavancar seus lucros em todas as mesas.</p>
+            </div>
+            <div class="shop-grid" id="shop-items-container"></div>
+          </div>
+
+          <!-- Section 2: Performance / Cash Boosts -->
+          <div class="shop-category-block" style="margin-top: 2rem;">
+            <div class="shop-category-title">
+              <h3>💰 Injeções de Dinheiro</h3>
+              <p>Compre dinheiro abaixo do valor de mercado para acelerar sua meta de fase. Risco zero!</p>
+            </div>
+            <div class="shop-grid" id="shop-performance-container"></div>
+          </div>
+
+          <!-- Section 3: Table Consumables (Buckshot Roulette) -->
+          <div class="shop-category-block" style="margin-top: 2rem;">
+            <div class="shop-category-title">
+              <h3>🎒 Cinto de Consumíveis Rápidos</h3>
+              <p>Itens descartáveis para salvar suas apostas, dobrar lucros ou obter dinheiro extra imediatamente.</p>
+            </div>
+            <div class="shop-grid" id="shop-consumables-container"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal: Floor Cleared / Meta Atingida -->
+  <div class="casino-modal-backdrop" id="modal-floor-success">
+    <div class="casino-modal-card success-card">
+      <div class="modal-icon-glow">🏆</div>
+      <h2 id="floor-success-title">ANDAR 1 SUPERADO!</h2>
+      <p id="floor-success-desc">Você pagou a cota da Casa e sobreviveu por mais uma noite.</p>
+      <div class="modal-actions">
+        <button id="floor-next-btn" class="btn-modal-action">
+          Subir para o Próximo Andar &amp; Abrir Loja ➔
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Game Over / Falência -->
+  <div class="casino-modal-backdrop" id="modal-gameover">
+    <div class="casino-modal-card gameover-card">
+      <div class="modal-icon-glow skull">💀</div>
+      <h2>FIM DE JOGO</h2>
+      <p id="gameover-reason">A Casa sempre vence no final. Você perdeu todo o seu dinheiro.</p>
+      <div class="gameover-stats-box" id="gameover-stats">
+        <!-- Injected dynamically -->
+      </div>
+      <div class="modal-actions">
+        <button id="gameover-restart-btn" class="btn-modal-action restart">
+          🔄 Tentar Novamente do Andar 1
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/audio.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/betting.js"></script>
+  <script src="js/roulette.js"></script>
+  <script src="js/blackjack.js"></script>
+  <script src="js/slots.js"></script>
+  <script src="js/plinko.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
